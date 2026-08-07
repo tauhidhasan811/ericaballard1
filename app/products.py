@@ -51,6 +51,7 @@ class Product:
             "image": self.image,
             "available": self.available,
             "product_type": self.product_type,
+            "description": self.description[:200] if self.description else "",
         }
 
 
