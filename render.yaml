@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: polo-assistant
+    env: python
+    plan: free
+    buildCommand: "uv sync"
+    startCommand: "uv run python main.py"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0

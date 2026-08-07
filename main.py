@@ -34,6 +34,11 @@ class ChatResponse(BaseModel):
     dog_profile: dict
 
 
+@app.get("/")
+def root() -> dict:
+    return {"status": "ok", "service": "polo-assistant"}
+
+
 @app.post("/chat", response_model=ChatResponse)
 def chat(req: ChatRequest) -> ChatResponse:
     try:
@@ -72,3 +77,9 @@ def refresh_catalog() -> dict:
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok", "shop": settings.SHOP_DOMAIN}
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("main:app", host=settings.HOST, port=settings.PORT)
