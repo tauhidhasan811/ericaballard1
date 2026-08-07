@@ -1,6 +1,74 @@
-def main():
-    print("Hello from ericaballard1!")
+"""FastAPI layer exposing Polo as a /chat endpoint for the storefront widget."""
+from __future__ import annotations
+
+import uuid
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from langchain_core.messages import AIMessage, HumanMessage
+from pydantic import BaseModel
+
+from app.config import settings
+from app.graph import polo_graph
+from app.products import catalog
+
+app = FastAPI(title="Polo Shopping Assistant")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # tighten to the storefront domain in production
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
-if __name__ == "__main__":
-    main()
+class ChatRequest(BaseModel):
+    session_id: str | None = None
+    message: str
+
+
+class ChatResponse(BaseModel):
+    status: bool = False
+    session_id: str
+    reply: str
+    dog_profile: dict
+
+
+@app.post("/chat", response_model=ChatResponse)
+def chat(req: ChatRequest) -> ChatResponse:
+    try:
+        session_id = req.session_id or str(uuid.uuid4())
+        config = {"configurable": {"thread_id": session_id}}
+
+        result = polo_graph.invoke({"messages": [HumanMessage(content=req.message)]}, config)
+
+        reply_text = next(
+            (m.content for m in reversed(result["messages"]) if isinstance(m, AIMessage) and m.content),
+            "",
+        )
+
+        return ChatResponse(
+            status=True,
+            session_id=session_id,
+            reply=reply_text,
+            dog_profile=result.get("dog_profile", {}),
+        )
+
+    except Exception as ex:
+        return ChatResponse(
+            session_id=req.session_id or str(uuid.uuid4()),
+            reply=f"Error: {ex}",
+            dog_profile={},
+        )
+
+
+@app.post("/admin/refresh-catalog")
+def refresh_catalog() -> dict:
+    """Force-refresh the cached product catalog ahead of the TTL."""
+    catalog.force_refresh()
+    return {"status": "ok", "product_count": len(catalog.all())}
+
+
+@app.get("/health")
+def health() -> dict:
+    return {"status": "ok", "shop": settings.SHOP_DOMAIN}
